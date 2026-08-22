@@ -765,3 +765,142 @@ body.is-playing .wave-bar { animation-play-state: running; }
     transition-duration: 0.001s !important;
   }
 }
+
+/* ---------- Playlist views / search / favourites ---------- */
+.playlist-panel__tools { display: flex; align-items: center; gap: 0.6rem; }
+
+.playlist-panel__views { display: flex; gap: 0.35rem; }
+
+.pv-btn {
+  font: inherit;
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+.pv-btn:hover { color: #fff; border-color: rgba(255, 255, 255, 0.28); }
+.pv-btn.is-active {
+  background: var(--accent);
+  color: #1a140a;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.playlist-search {
+  width: calc(100% - 0.8rem);
+  margin: 0.6rem 0.4rem 0.2rem;
+  padding: 0.52rem 0.85rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.playlist-search:focus { border-color: rgba(230, 184, 76, 0.55); box-shadow: 0 0 0 3px var(--accent-soft); }
+.playlist-search::placeholder { color: var(--faint); }
+
+.playlist__fav {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.playlist__fav:hover { transform: scale(1.18); color: #ff6b81; }
+.playlist__fav svg path { fill: none; stroke: currentColor; stroke-width: 2; }
+.playlist__fav.is-fav { color: #ff6b81; }
+.playlist__fav.is-fav svg path { fill: currentColor; stroke: none; }
+
+.playlist-panel__list { transition: height 0.22s ease; }
+
+.playlist__empty {
+  padding: 1.4rem 0.9rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* ---------- Playbar favourite button ---------- */
+.fav-toggle {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.fav-toggle:hover { color: #ff6b81; transform: scale(1.14); }
+.fav-toggle svg path { fill: none; stroke: currentColor; stroke-width: 2; }
+.fav-toggle.is-fav { color: #ff6b81; }
+.fav-toggle.is-fav svg path { fill: currentColor; stroke: none; }
+.fav-toggle.is-fav:hover { transform: scale(1.14); }
+
+@media (max-width: 640px) {
+  .fav-toggle { width: 28px; height: 28px; }
+}
+
+/* ---------- Topbar: paste YouTube link ---------- */
+.topbar { flex-wrap: wrap; row-gap: 0.6rem; }
+
+.link-fetch { display: flex; align-items: center; gap: 0.45rem; }
+
+.link-fetch__input {
+  width: min(300px, 42vw);
+  padding: 0.5rem 0.85rem;
+  font: inherit;
+  font-size: 0.78rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.link-fetch__input:focus { border-color: rgba(230, 184, 76, 0.55); box-shadow: 0 0 0 3px var(--accent-soft); }
+.link-fetch__input::placeholder { color: var(--faint); }
+.link-fetch__input.is-error { border-color: #ff6b81; box-shadow: 0 0 0 3px rgba(255, 107, 129, 0.18); }
+
+.link-fetch__btn {
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(90deg, #f0c55e, var(--accent));
+  color: #1a140a;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.link-fetch__btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+.link-fetch__btn:disabled { opacity: 0.6; cursor: wait; transform: none; }
+
+@media (max-width: 760px) {
+  .topbar { padding: 0.8rem 1rem; }
+  .link-fetch { order: 3; width: 100%; }
+  .link-fetch__input { flex: 1; width: auto; min-width: 0; }
+}

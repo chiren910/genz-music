@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="style.css?v=26"/>
+  <link rel="stylesheet" href="style.css?v=29"/>
 </head>
 <body>
   <div class="bg" aria-hidden="true">
@@ -87,6 +87,10 @@
       <span class="topbar__sep" aria-hidden="true"></span>
       <div class="listeners" aria-hidden="true"><span class="listeners__dot"></span><span class="listeners__count">&nbsp;</span></div>
     </div>
+    <div class="link-fetch">
+      <input class="link-fetch__input" id="ytLink" type="text" placeholder="Paste YouTube song link&hellip;" autocomplete="off" spellcheck="false" aria-label="Paste YouTube song link"/>
+      <button class="link-fetch__btn" id="btnFetchLink" title="Play pasted song">Play</button>
+    </div>
     <nav class="links" aria-label="Support and listen elsewhere">
       <a class="support" href="#" title="Support me">Support me</a>
       <a class="link" href="https://music.youtube.com" target="_blank" rel="noopener noreferrer" aria-label="Open YouTube Music" title="YouTube Music">YouTube Music</a>
@@ -128,8 +132,15 @@
   <div class="playlist-panel" id="playlistPanel" hidden>
     <div class="playlist-panel__head">
       <span class="playlist-panel__title">Up Next</span>
-      <span class="playlist-panel__count" id="playlistCount">&nbsp;</span>
+      <div class="playlist-panel__tools">
+        <div class="playlist-panel__views" role="group" aria-label="Playlist view">
+          <button class="pv-btn is-active" id="viewAll" aria-pressed="true">All</button>
+          <button class="pv-btn" id="viewFavs" aria-pressed="false">Favourites</button>
+        </div>
+        <span class="playlist-panel__count" id="playlistCount">&nbsp;</span>
+      </div>
     </div>
+    <input class="playlist-search" id="playlistSearch" type="search" placeholder="Search song or artist&hellip;" autocomplete="off" aria-label="Search songs"/>
     <ul class="playlist-panel__list" id="playlistList"></ul>
   </div>
 
@@ -149,12 +160,9 @@
           <p class="player-bar__title" id="trackTitle">&nbsp;</p>
           <p class="player-bar__artist" id="trackArtist">&nbsp;</p>
         </div>
-        <div class="eq" id="eq" aria-hidden="true">
-          <span class="eq__bar"></span>
-          <span class="eq__bar"></span>
-          <span class="eq__bar"></span>
-          <span class="eq__bar"></span>
-        </div>
+        <button class="fav-toggle" id="btnFav" title="Add to favourites" aria-label="Toggle favourite" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="17" height="17"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        </button>
       </div>
 
       <div class="player-bar__mid">
@@ -200,6 +208,6 @@
     <div id="ytPlayer"></div>
   </div>
 
-  <script src="main.js?v=16"></script>
+  <script src="main.js?v=32"></script>
 </body>
 </html>
