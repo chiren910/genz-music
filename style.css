@@ -687,6 +687,36 @@ body.is-playing .wave-bar { animation-play-state: running; }
 .list-toggle:hover { color: var(--ink); border-color: rgba(230, 184, 76, 0.5); background: var(--panel-soft); }
 .list-toggle[aria-expanded="true"] { color: var(--accent); border-color: rgba(230, 184, 76, 0.6); }
 
+/* playbar download */
+.dl-btn {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  position: relative;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.dl-btn:hover { color: var(--accent); border-color: rgba(230, 184, 76, 0.5); background: var(--panel-soft); }
+.dl-btn:disabled { opacity: 0.35; pointer-events: none; }
+.dl-btn.is-busy { color: var(--accent); border-color: rgba(230, 184, 76, 0.5); pointer-events: none; }
+.dl-btn.is-busy svg { display: none; }
+.dl-btn.is-busy::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(230, 184, 76, 0.25);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+
 /* volume */
 .player-bar__volume {
   flex: 0 0 auto;
@@ -746,14 +776,63 @@ body.is-playing .wave-bar { animation-play-state: running; }
 
 /* ---------- responsive ---------- */
 @media (max-width: 760px) {
-  .player-bar__inner { display: flex; flex-wrap: wrap; gap: 0.6rem; padding: 0.7rem 0.9rem; }
-  .player-bar__left { flex: 1 1 55%; }
-  .player-bar__mid { order: 3; flex: 1 1 100%; }
-  .player-bar__right { flex: 0 0 auto; }
+  /* Background art: slice-zoom overcrops the 16:9 wave/circle artwork on
+     portrait screens. Shrink the stage so more of the composition stays
+     visible and softly fade it behind the content. Same palette, better fit. */
+  .bg__wave { overflow: hidden; }
+  .bg__wave svg {
+    flex: none;
+    width: auto;
+    height: 72vh;
+    transform: translateY(4%);
+    opacity: 0.85;
+  }
+
+  /* Playbar: two-row grid — info row on top, controls full-width below,
+     download + playlist stacked as a right rail spanning both rows. */
+  .player-bar__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "left tools"
+      "mid tools";
+    align-items: center;
+    gap: 0.55rem 0.7rem;
+    padding: 0.65rem 0.8rem calc(0.65rem + env(safe-area-inset-bottom, 0px));
+  }
+  .player-bar__left { grid-area: left; flex: 1 1 auto; min-width: 0; }
+  .player-bar__mid { grid-area: mid; width: 100%; max-width: none; }
+  .player-bar__right {
+    grid-area: tools;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .disc { width: 46px; height: 46px; }
+  .disc__art { inset: 9px; }
+  .disc__art svg { width: 18px; height: 18px; }
+  .player-bar__info { flex: 1 1 auto; min-width: 0; }
+  .dl-btn, .list-toggle { width: 38px; height: 38px; border-radius: 11px; }
+  .fav-toggle { width: 30px; height: 30px; }
   .eq { display: none; }
   .player-bar__volume { display: none; }
   .genre-tab { gap: 0.4rem; padding: 0.65rem 0.8rem 0.5rem; }
   .genre-tab__btn { font-size: 0.65rem; padding: 0.36rem 0.9rem; letter-spacing: 0.12em; }
+
+  /* Brand block: clear the wrapped topbar and keep type balanced */
+  .shell {
+    padding: 10.5rem 1.25rem calc(13rem + env(safe-area-inset-bottom, 0px));
+    justify-content: flex-start;
+  }
+  .brand__eyebrow {
+    font-size: 0.62rem;
+    letter-spacing: 0.2em;
+    margin-bottom: 0.75rem;
+  }
+  .brand__name { font-size: clamp(2.35rem, 11vw, 3rem); }
+  .brand__tag { margin-top: 0.75rem; font-size: 0.84rem; }
+  .marquee { margin-top: 1.7rem; }
   .stats { flex-wrap: wrap; justify-content: center; gap: 0.6rem; }
   .stat { flex: 1 1 40%; min-width: 126px; padding: 0.8rem 1rem; }
 }
@@ -864,7 +943,7 @@ body.is-playing .wave-bar { animation-play-state: running; }
 /* ---------- Topbar: paste YouTube link ---------- */
 .topbar { flex-wrap: wrap; row-gap: 0.6rem; }
 
-.link-fetch { display: flex; align-items: center; gap: 0.45rem; }
+.link-fetch { display: flex; align-items: center; gap: 0.45rem; position: relative; }
 
 .link-fetch__input {
   width: min(300px, 42vw);
@@ -898,6 +977,91 @@ body.is-playing .wave-bar { animation-play-state: running; }
 }
 .link-fetch__btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
 .link-fetch__btn:disabled { opacity: 0.6; cursor: wait; transform: none; }
+
+/* ---------- Paste-link popup: Play / Download ---------- */
+.dl-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: min(340px, 92vw);
+  padding: 0.55rem 0.65rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  animation: dlPopIn 0.16s ease;
+}
+.dl-pop[hidden] { display: none; }
+
+@keyframes dlPopIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dl-pop__thumb {
+  width: 52px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 7px;
+  flex: none;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dl-pop__info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.dl-pop__name {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dl-pop__sub {
+  font-size: 0.64rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dl-pop__actions { display: flex; align-items: center; gap: 0.35rem; flex: none; }
+
+.dl-pop__btn {
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 0.42rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease, background 0.15s ease;
+}
+
+.dl-pop__btn--play {
+  border: 1px solid var(--line);
+  background: var(--panel-soft);
+  color: var(--ink);
+}
+.dl-pop__btn--play:hover { transform: translateY(-1px); border-color: rgba(230, 184, 76, 0.45); }
+
+@media (max-width: 760px) {
+  .dl-pop { left: 0; right: 0; width: auto; }
+}
 
 @media (max-width: 760px) {
   .topbar { padding: 0.8rem 1rem; }

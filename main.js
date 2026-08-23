@@ -268,8 +268,14 @@
   const viewAllBtn = document.getElementById("viewAll");
   const viewFavsBtn = document.getElementById("viewFavs");
   const btnFav = document.getElementById("btnFav");
+  const btnDownload = document.getElementById("btnDownload");
   const ytLinkInput = document.getElementById("ytLink");
   const btnFetchLink = document.getElementById("btnFetchLink");
+  const dlPop = document.getElementById("dlPop");
+  const dlThumb = document.getElementById("dlThumb");
+  const dlTitle = document.getElementById("dlTitle");
+  const dlArtist = document.getElementById("dlArtist");
+  const btnPopPlay = document.getElementById("btnPopPlay");
 
   let idx = 0;
   let playing = false;
@@ -370,6 +376,19 @@
     return fallbackChannel || "";
   };
 
+  const fetchOEmbed = async (vid) => {
+    try {
+      const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${vid}`);
+      const data = await res.json();
+      return {
+        title: (data && data.title) || "YouTube Song",
+        artist: (data && data.author_name) || "Unknown artist",
+      };
+    } catch (_) {
+      return { title: "YouTube Song", artist: "Unknown artist" };
+    }
+  };
+
   const handlePastedLink = async () => {
     const raw = ytLinkInput.value.trim();
     if (!raw || btnFetchLink.disabled) return;
@@ -384,19 +403,11 @@
       ytLinkInput.value = "";
       startTrack(existingIdx);
       updateActive();
-      setList(true);
       return;
     }
     btnFetchLink.disabled = true;
     btnFetchLink.textContent = "...";
-    let title = "YouTube Song";
-    let artist = "Unknown artist";
-    try {
-      const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${vid}`);
-      const data = await res.json();
-      if (data && data.title) title = data.title;
-      if (data && data.author_name) artist = data.author_name;
-    } catch (_) {}
+    let { title, artist } = await fetchOEmbed(vid);
     title = cleanTitle(title);
     artist = deriveArtist(title, artist) || artist;
     const tr = { title, artist, dur: 0, vid };
@@ -409,8 +420,61 @@
     btnFetchLink.textContent = "Play";
     startTrack(0);
     updateActive();
-    setList(true);
   };
+
+  /* ---------- Paste link -> show Play / Download options ---------- */
+  let dlPopTimer = null;
+  let dlPopVid = null;
+
+  const hideDlPop = () => {
+    clearTimeout(dlPopTimer);
+    dlPopVid = null;
+    if (dlPop) dlPop.hidden = true;
+  };
+
+  const showDlPopFor = async (vid) => {
+    if (!dlPop || !vid) return;
+    if (dlPopVid === vid && !dlPop.hidden) return;
+    dlPopVid = vid;
+    dlThumb.src = `https://i.ytimg.com/vi/${vid}/mqdefault.jpg`;
+    dlTitle.textContent = "\u2026";
+    dlArtist.textContent = "";
+    dlTitle.title = "";
+    dlPop.hidden = false;
+    const meta = await fetchOEmbed(vid);
+    if (dlPopVid !== vid) return; // input changed while fetching
+    dlTitle.textContent = meta.title.length > 44 ? `${meta.title.slice(0, 44).trimEnd()}\u2026` : meta.title;
+    dlTitle.title = meta.title;
+    dlArtist.textContent = meta.artist;
+  };
+
+  const syncDlPop = () => {
+    const vid = extractVideoId(ytLinkInput.value);
+    if (vid) {
+      clearTimeout(dlPopTimer);
+      dlPopTimer = setTimeout(() => showDlPopFor(vid), 250);
+    } else {
+      hideDlPop();
+    }
+  };
+
+  if (dlPop) {
+    ytLinkInput.addEventListener("input", syncDlPop);
+    ytLinkInput.addEventListener("paste", () => setTimeout(syncDlPop, 0));
+
+    btnPopPlay.addEventListener("click", () => {
+      handlePastedLink(); // clears the input, which hides the popup
+      hideDlPop();
+    });
+
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideDlPop(); });
+    document.addEventListener("click", (e) => {
+      if (dlPop.hidden) return;
+      if (dlPop.contains(e.target) || e.target === ytLinkInput) return;
+      hideDlPop();
+    });
+    window.addEventListener("pagehide", hideDlPop);
+  }
 
   const fmtTime = (s) => `${Math.floor(s / 60)}:${fmt(s % 60)}`;
 
@@ -579,6 +643,7 @@
     persistPosition();
     updateActive();
     syncFavBtn();
+    if (btnDownload) btnDownload.disabled = !tr.vid;
   };
 
   const step = (ts) => {
@@ -746,6 +811,29 @@
   viewAllBtn.addEventListener("click", () => setView("all"));
   viewFavsBtn.addEventListener("click", () => setView("favs"));
   btnFav.addEventListener("click", () => toggleFav(idx));
+
+  /* ---------- Playbar: download the current song as MP3 ---------- */
+  if (btnDownload) {
+    btnDownload.addEventListener("click", async () => {
+      const tr = tracks[idx];
+      if (!tr || !tr.vid || btnDownload.classList.contains("is-busy")) return;
+      btnDownload.classList.add("is-busy");
+      try {
+        const res = await fetch(`api/download.php?v=${tr.vid}`);
+        if (!res.ok) throw new Error("download failed");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${tr.title || "song"}.mp3`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      } catch (_) {}
+      btnDownload.classList.remove("is-busy");
+    });
+  }
   ytLinkInput.addEventListener("keydown", (e) => { if (e.key === "Enter") handlePastedLink(); });
   btnFetchLink.addEventListener("click", handlePastedLink);
   searchInput.addEventListener("input", () => {

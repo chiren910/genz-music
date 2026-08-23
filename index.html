@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="style.css?v=29"/>
+  <link rel="stylesheet" href="style.css?v=34"/>
 </head>
 <body>
   <div class="bg" aria-hidden="true">
@@ -90,6 +90,16 @@
     <div class="link-fetch">
       <input class="link-fetch__input" id="ytLink" type="text" placeholder="Paste YouTube song link&hellip;" autocomplete="off" spellcheck="false" aria-label="Paste YouTube song link"/>
       <button class="link-fetch__btn" id="btnFetchLink" title="Play pasted song">Play</button>
+      <div class="dl-pop" id="dlPop" hidden>
+        <img class="dl-pop__thumb" id="dlThumb" alt="" width="52" height="30"/>
+        <div class="dl-pop__info">
+          <span class="dl-pop__name" id="dlTitle">Loading&hellip;</span>
+          <span class="dl-pop__sub" id="dlArtist">&nbsp;</span>
+        </div>
+        <div class="dl-pop__actions">
+        <button class="dl-pop__btn dl-pop__btn--play" id="btnPopPlay" title="Play this song">Play</button>
+      </div>
+      </div>
     </div>
     <nav class="links" aria-label="Support and listen elsewhere">
       <a class="support" href="#" title="Support me">Support me</a>
@@ -193,6 +203,9 @@
       </div>
 
       <div class="player-bar__right">
+        <button class="dl-btn" id="btnDownload" title="Download this song (MP3)" aria-label="Download current song">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+        </button>
         <button class="list-toggle" id="btnList" title="Show playlist" aria-label="Show playlist" aria-expanded="false" aria-controls="playlistPanel">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h12v2H3z"/></svg>
         </button>
@@ -208,6 +221,6 @@
     <div id="ytPlayer"></div>
   </div>
 
-  <script src="main.js?v=32"></script>
+  <script src="main.js?v=34"></script>
 </body>
 </html>
