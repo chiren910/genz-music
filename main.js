@@ -837,30 +837,40 @@
       const tr = tracks[idx];
       if (!tr || !tr.vid || btnDownload.classList.contains("is-busy")) return;
 
-      const dlUrl = `api/download.php?v=${tr.vid}`;
+      const rawTitle = (tr.title || "song").trim();
+      const cleanName = rawTitle.replace(/[\\/:*?"<>|]/g, "").trim() || "song";
+      const safeAscii = cleanName.replace(/[^a-zA-Z0-9_\-]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "") || "song";
+      const fileName = `${safeAscii}.mp3`;
 
-      /* ---- Mobile: let the browser handle the download natively ---- */
+      // End URL with .mp3 via PATH_INFO so mobile browsers & download managers always save as .mp3
+      const dlUrl = `api/download.php/${encodeURIComponent(fileName)}?v=${encodeURIComponent(tr.vid)}&name=${encodeURIComponent(cleanName)}`;
+
+      /* ---- Mobile: native download with explicit .mp3 filename & path ---- */
       if (isMobile()) {
-        showToast("⬇ Starting download\u2026 please wait");
+        btnDownload.classList.add("is-busy");
+        showToast("⬇ Preparing MP3 download… please wait", 5000);
         try {
-          /* Use a hidden link with target _blank — more reliable than
-             window.open on iOS Safari which may block popup windows. */
           const a = document.createElement("a");
           a.href = dlUrl;
+          a.download = `${cleanName}.mp3`;
           a.target = "_blank";
           a.rel = "noopener noreferrer";
           document.body.appendChild(a);
           a.click();
-          a.remove();
+          setTimeout(() => {
+            a.remove();
+            btnDownload.classList.remove("is-busy");
+          }, 3000);
         } catch (_) {
-          /* Fallback: plain window.open */
           window.open(dlUrl, "_blank");
+          btnDownload.classList.remove("is-busy");
         }
         return;
       }
 
       /* ---- Desktop: fetch blob for smooth in-page download ---- */
       btnDownload.classList.add("is-busy");
+      showToast("⬇ Converting to 320kbps MP3…", 4000);
       try {
         const res = await fetch(dlUrl);
         if (!res.ok) {
@@ -871,11 +881,12 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${tr.title || "song"}.mp3`;
+        a.download = `${cleanName}.mp3`;
         document.body.appendChild(a);
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 30000);
+        showToast("✅ MP3 downloaded!");
       } catch (err) {
         showToast("⚠ " + (err.message || "Download failed — try again"));
       }

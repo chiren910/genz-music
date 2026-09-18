@@ -111,19 +111,45 @@ if (strtolower(pathinfo($file, PATHINFO_EXTENSION)) !== 'mp3') {
     exit("Conversion failed: non-MP3 output.");
 }
 
+if ($title === '') {
+    if (!empty($_GET['name'])) {
+        $title = trim((string)$_GET['name']);
+    } elseif (!empty($_GET['title'])) {
+        $title = trim((string)$_GET['title']);
+    } elseif (!empty($_SERVER['PATH_INFO'])) {
+        $pi = pathinfo((string)$_SERVER['PATH_INFO'], PATHINFO_FILENAME);
+        if ($pi !== '') $title = $pi;
+    }
+}
+
 /* Build a safe filename from the title. */
 $safe = preg_replace('/[\\\\\/:*?"<>|\x00-\x1F]/u', '', html_entity_decode($title, ENT_QUOTES | ENT_HTML5));
 $safe = trim(preg_replace('/\s+/', ' ', (string)$safe));
-if ($safe === '') $safe = 'youtube-audio';
+if ($safe === '') $safe = 'song';
 if (mb_strlen($safe) > 80) $safe = mb_substr($safe, 0, 80);
 
+/* Strict ASCII filename for legacy/mobile parsers (e.g. Android Download Manager) */
+$asciiSafe = preg_replace('/[^a-zA-Z0-9_\-\. ]/', '', $safe);
+$asciiSafe = trim(preg_replace('/\s+/', ' ', (string)$asciiSafe));
+if ($asciiSafe === '') {
+    $asciiSafe = 'song';
+}
+
+/* Clear any previously sent output buffers to prevent MP3 corruption */
+while (ob_get_level() > 0) {
+    @ob_end_clean();
+}
+
+header('Content-Description: File Transfer');
 header('Content-Type: audio/mpeg');
-header('X-Content-Type-Options: nosniff');
-header('Accept-Ranges: none');
-header('Access-Control-Allow-Origin: *');
-header('Content-Disposition: attachment; filename="' . str_replace('"', '', $safe) . '.mp3"; filename*=UTF-8\'\'' . rawurlencode($safe . '.mp3'));
+header('Content-Disposition: attachment; filename="' . $asciiSafe . '.mp3"; filename*=UTF-8\'\'' . rawurlencode($safe . '.mp3'));
+header('Content-Transfer-Encoding: binary');
+header('Expires: 0');
+header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+header('Pragma: public');
 header('Content-Length: ' . (string)filesize($file));
-header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff');
+header('Access-Control-Allow-Origin: *');
 
 /* Stream in chunks so huge files don't blow the memory limit. */
 $fh = fopen($file, 'rb');
