@@ -841,43 +841,40 @@
       const cleanName = rawTitle.replace(/[\\/:*?"<>|]/g, "").trim() || "song";
       const safeAscii = cleanName.replace(/[^a-zA-Z0-9_\-]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "") || "song";
       const fileName = `${safeAscii}.mp3`;
+      const ytUrl = `https://www.youtube.com/watch?v=${tr.vid}`;
 
-      // End URL with .mp3 via PATH_INFO so mobile browsers & download managers always save as .mp3
-      const dlUrl = `api/download.php/${encodeURIComponent(fileName)}?v=${encodeURIComponent(tr.vid)}&name=${encodeURIComponent(cleanName)}`;
+      // Static hosts like Vercel / GitHub Pages do not run PHP or yt-dlp binaries
+      const isStaticHost = window.location.hostname.includes("vercel.app") ||
+                           window.location.hostname.includes("github.io") ||
+                           window.location.protocol === "file:";
 
-      /* ---- Mobile: native download with explicit .mp3 filename & path ---- */
-      if (isMobile()) {
-        btnDownload.classList.add("is-busy");
-        showToast("⬇ Preparing MP3 download… please wait", 5000);
-        try {
-          const a = document.createElement("a");
-          a.href = dlUrl;
-          a.download = `${cleanName}.mp3`;
-          a.target = "_blank";
-          a.rel = "noopener noreferrer";
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(() => {
-            a.remove();
-            btnDownload.classList.remove("is-busy");
-          }, 3000);
-        } catch (_) {
-          window.open(dlUrl, "_blank");
-          btnDownload.classList.remove("is-busy");
-        }
+      if (isStaticHost) {
+        showToast("⬇ Opening MP3 downloader…", 4000);
+        window.open(`https://cobalt.tools/?u=${encodeURIComponent(ytUrl)}`, "_blank");
         return;
       }
 
-      /* ---- Desktop: fetch blob for smooth in-page download ---- */
+      // On local/VPS PHP backend: stream 320kbps MP3
+      const dlUrl = `api/download.php/${encodeURIComponent(fileName)}?v=${encodeURIComponent(tr.vid)}&name=${encodeURIComponent(cleanName)}`;
+
       btnDownload.classList.add("is-busy");
-      showToast("⬇ Converting to 320kbps MP3…", 4000);
+      showToast("⬇ Converting to 320kbps MP3… please wait", 8000);
+
       try {
         const res = await fetch(dlUrl);
         if (!res.ok) {
-          const errText = await res.text().catch(() => "Download failed");
+          const errText = await res.text().catch(() => "Conversion failed");
           throw new Error(errText);
         }
+        const contentType = (res.headers.get("content-type") || "").toLowerCase();
+        if (!contentType.includes("audio") && !contentType.includes("octet-stream")) {
+          throw new Error("Invalid response format");
+        }
         const blob = await res.blob();
+        // Prevent downloading corrupted or error response pages
+        if (blob.size < 1024) {
+          throw new Error("File too small");
+        }
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -886,11 +883,14 @@
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 30000);
-        showToast("✅ MP3 downloaded!");
+        showToast("✅ " + cleanName + ".mp3 downloaded!");
       } catch (err) {
-        showToast("⚠ " + (err.message || "Download failed — try again"));
+        // Fallback to online MP3 downloader if local conversion is unavailable
+        showToast("⚠ Opening backup MP3 downloader…", 4000);
+        window.open(`https://cobalt.tools/?u=${encodeURIComponent(ytUrl)}`, "_blank");
+      } finally {
+        btnDownload.classList.remove("is-busy");
       }
-      btnDownload.classList.remove("is-busy");
     });
   }
   ytLinkInput.addEventListener("keydown", (e) => { if (e.key === "Enter") handlePastedLink(); });
