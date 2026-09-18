@@ -813,14 +813,60 @@
   btnFav.addEventListener("click", () => toggleFav(idx));
 
   /* ---------- Playbar: download the current song as MP3 ---------- */
+  const toastEl = document.getElementById("toast");
+  let toastTimer = null;
+  const showToast = (msg, dur = 3500) => {
+    if (!toastEl) return;
+    clearTimeout(toastTimer);
+    toastEl.textContent = msg;
+    toastEl.hidden = false;
+    toastEl.classList.add("is-visible");
+    toastTimer = setTimeout(() => {
+      toastEl.classList.remove("is-visible");
+      setTimeout(() => { toastEl.hidden = true; }, 300);
+    }, dur);
+  };
+
+  const isMobile = () => {
+    if ("ontouchstart" in window || navigator.maxTouchPoints > 0) return true;
+    return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
   if (btnDownload) {
     btnDownload.addEventListener("click", async () => {
       const tr = tracks[idx];
       if (!tr || !tr.vid || btnDownload.classList.contains("is-busy")) return;
+
+      const dlUrl = `api/download.php?v=${tr.vid}`;
+
+      /* ---- Mobile: let the browser handle the download natively ---- */
+      if (isMobile()) {
+        showToast("⬇ Starting download\u2026 please wait");
+        try {
+          /* Use a hidden link with target _blank — more reliable than
+             window.open on iOS Safari which may block popup windows. */
+          const a = document.createElement("a");
+          a.href = dlUrl;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        } catch (_) {
+          /* Fallback: plain window.open */
+          window.open(dlUrl, "_blank");
+        }
+        return;
+      }
+
+      /* ---- Desktop: fetch blob for smooth in-page download ---- */
       btnDownload.classList.add("is-busy");
       try {
-        const res = await fetch(`api/download.php?v=${tr.vid}`);
-        if (!res.ok) throw new Error("download failed");
+        const res = await fetch(dlUrl);
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "Download failed");
+          throw new Error(errText);
+        }
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -830,7 +876,9 @@
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 30000);
-      } catch (_) {}
+      } catch (err) {
+        showToast("⚠ " + (err.message || "Download failed — try again"));
+      }
       btnDownload.classList.remove("is-busy");
     });
   }

@@ -119,6 +119,8 @@ if (mb_strlen($safe) > 80) $safe = mb_substr($safe, 0, 80);
 
 header('Content-Type: audio/mpeg');
 header('X-Content-Type-Options: nosniff');
+header('Accept-Ranges: none');
+header('Access-Control-Allow-Origin: *');
 header('Content-Disposition: attachment; filename="' . str_replace('"', '', $safe) . '.mp3"; filename*=UTF-8\'\'' . rawurlencode($safe . '.mp3'));
 header('Content-Length: ' . (string)filesize($file));
 header('Cache-Control: no-store');
