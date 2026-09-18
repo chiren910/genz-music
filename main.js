@@ -843,22 +843,17 @@
       const fileName = `${safeAscii}.mp3`;
       const ytUrl = `https://www.youtube.com/watch?v=${tr.vid}`;
 
-      // Static hosts like Vercel / GitHub Pages do not run PHP or yt-dlp binaries
+      const RENDER_BACKEND = "https://genz-music-backend.onrender.com";
       const isStaticHost = window.location.hostname.includes("vercel.app") ||
                            window.location.hostname.includes("github.io") ||
                            window.location.protocol === "file:";
 
-      if (isStaticHost) {
-        showToast("⬇ Opening MP3 downloader…", 4000);
-        window.open(`https://cobalt.tools/?u=${encodeURIComponent(ytUrl)}`, "_blank");
-        return;
-      }
-
-      // On local/VPS PHP backend: stream 320kbps MP3
-      const dlUrl = `api/download.php/${encodeURIComponent(fileName)}?v=${encodeURIComponent(tr.vid)}&name=${encodeURIComponent(cleanName)}`;
+      const dlUrl = isStaticHost
+        ? `${RENDER_BACKEND}/download/${encodeURIComponent(fileName)}?v=${encodeURIComponent(tr.vid)}&name=${encodeURIComponent(cleanName)}`
+        : `api/download.php/${encodeURIComponent(fileName)}?v=${encodeURIComponent(tr.vid)}&name=${encodeURIComponent(cleanName)}`;
 
       btnDownload.classList.add("is-busy");
-      showToast("⬇ Converting to 320kbps MP3… please wait", 8000);
+      showToast("⬇ Converting to 320kbps MP3… please wait", 12000);
 
       try {
         const res = await fetch(dlUrl);
@@ -871,7 +866,6 @@
           throw new Error("Invalid response format");
         }
         const blob = await res.blob();
-        // Prevent downloading corrupted or error response pages
         if (blob.size < 1024) {
           throw new Error("File too small");
         }
@@ -885,7 +879,6 @@
         setTimeout(() => URL.revokeObjectURL(url), 30000);
         showToast("✅ " + cleanName + ".mp3 downloaded!");
       } catch (err) {
-        // Fallback to online MP3 downloader if local conversion is unavailable
         showToast("⚠ Opening backup MP3 downloader…", 4000);
         window.open(`https://cobalt.tools/?u=${encodeURIComponent(ytUrl)}`, "_blank");
       } finally {

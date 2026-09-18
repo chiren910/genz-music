@@ -1,0 +1,16 @@
+{
+  "name": "genz-music-backend",
+  "version": "1.0.0",
+  "description": "320kbps YouTube to MP3 converter API for GENZ MUSIC",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
