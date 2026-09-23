@@ -864,6 +864,22 @@
       : `api/download.php/${encodeURIComponent(fileName)}?v=${encodeURIComponent(tr.vid)}&name=${encodeURIComponent(cleanName)}`;
 
     if (btnEl) btnEl.classList.add("is-busy");
+
+    if (isMobile()) {
+      showToast("⬇ Converting 320kbps MP3… download will start shortly", 15000);
+      const a = document.createElement("a");
+      a.href = dlUrl;
+      a.download = fileName;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        a.remove();
+        if (btnEl) btnEl.classList.remove("is-busy");
+      }, 8000);
+      return true;
+    }
+
     showToast("⬇ Converting to 320kbps MP3… please wait", 12000);
 
     try {
