@@ -832,60 +832,243 @@
     return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   };
 
+  const RENDER_BACKEND = "https://genz-music-backend.onrender.com";
+  const isStaticHost = () =>
+    window.location.hostname.includes("vercel.app") ||
+    window.location.hostname.includes("github.io") ||
+    window.location.protocol === "file:";
+
+  const searchEndpoint = (q) => {
+    const params = new URLSearchParams({ q, count: "10" });
+    return `${isStaticHost() ? `${RENDER_BACKEND}/search?` : "api/search.php?"}${params.toString()}`;
+  };
+
+  const downloadTrack = async (tr, btnEl = null) => {
+    if (!tr || !tr.vid) return false;
+    if (btnEl && btnEl.classList.contains("is-busy")) return false;
+
+    const rawTitle = (tr.title || "song").trim();
+    const cleanName = rawTitle.replace(/[\\/:*?"<>|]/g, "").trim() || "song";
+    const safeAscii = cleanName.replace(/[^a-zA-Z0-9_\-]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "") || "song";
+    const fileName = `${safeAscii}.mp3`;
+    const ytUrl = `https://www.youtube.com/watch?v=${tr.vid}`;
+
+    const dlUrl = isStaticHost()
+      ? `${RENDER_BACKEND}/download/${encodeURIComponent(fileName)}?v=${encodeURIComponent(tr.vid)}&name=${encodeURIComponent(cleanName)}`
+      : `api/download.php/${encodeURIComponent(fileName)}?v=${encodeURIComponent(tr.vid)}&name=${encodeURIComponent(cleanName)}`;
+
+    if (btnEl) btnEl.classList.add("is-busy");
+    showToast("⬇ Converting to 320kbps MP3… please wait", 12000);
+
+    try {
+      const res = await fetch(dlUrl);
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "Conversion failed");
+        throw new Error(errText);
+      }
+      const contentType = (res.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.includes("audio") && !contentType.includes("octet-stream")) {
+        throw new Error("Invalid response format");
+      }
+      const blob = await res.blob();
+      if (blob.size < 1024) {
+        throw new Error("File too small");
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${cleanName}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      showToast("✅ " + cleanName + ".mp3 downloaded!");
+      return true;
+    } catch (err) {
+      showToast("⚠ Opening backup MP3 downloader…", 4000);
+      window.open(`https://cobalt.tools/?u=${encodeURIComponent(ytUrl)}`, "_blank");
+      return false;
+    } finally {
+      if (btnEl) btnEl.classList.remove("is-busy");
+    }
+  };
+
   if (btnDownload) {
-    btnDownload.addEventListener("click", async () => {
-      const tr = tracks[idx];
-      if (!tr || !tr.vid || btnDownload.classList.contains("is-busy")) return;
+    btnDownload.addEventListener("click", () => { downloadTrack(tracks[idx], btnDownload); });
+  }
 
-      const rawTitle = (tr.title || "song").trim();
-      const cleanName = rawTitle.replace(/[\\/:*?"<>|]/g, "").trim() || "song";
-      const safeAscii = cleanName.replace(/[^a-zA-Z0-9_\-]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "") || "song";
-      const fileName = `${safeAscii}.mp3`;
-      const ytUrl = `https://www.youtube.com/watch?v=${tr.vid}`;
+  /* ---------- YouTube song search ---------- */
+  const ytSearchInput = document.getElementById("ytSearch");
+  const searchBtn = document.getElementById("btnSearch");
+  const searchDrop = document.getElementById("searchDrop");
+  const searchList = document.getElementById("searchList");
+  const searchEmpty = document.getElementById("searchEmpty");
+  const searchScrim = document.getElementById("searchScrim");
+  const MAX_SONG_SEC = 30 * 60; // hide anything longer than 30 minutes
+  let searchSeq = 0;
+  let searchDeb = null;
 
-      const RENDER_BACKEND = "https://genz-music-backend.onrender.com";
-      const isStaticHost = window.location.hostname.includes("vercel.app") ||
-                           window.location.hostname.includes("github.io") ||
-                           window.location.protocol === "file:";
+  const hideSearchDrop = () => {
+    clearTimeout(searchDeb);
+    setSearchBusy(false);
+    if (searchList) searchList.style.maxHeight = "";
+    if (searchScrim) searchScrim.hidden = true;
+    if (searchDrop && !searchDrop.hidden) searchDrop.hidden = true;
+  };
 
-      const dlUrl = isStaticHost
-        ? `${RENDER_BACKEND}/download/${encodeURIComponent(fileName)}?v=${encodeURIComponent(tr.vid)}&name=${encodeURIComponent(cleanName)}`
-        : `api/download.php/${encodeURIComponent(fileName)}?v=${encodeURIComponent(tr.vid)}&name=${encodeURIComponent(cleanName)}`;
+  const setSearchBusy = (on) => {
+    if (!searchBtn) return;
+    searchBtn.disabled = on;
+    searchBtn.classList.toggle("is-busy", on);
+  };
 
-      btnDownload.classList.add("is-busy");
-      showToast("⬇ Converting to 320kbps MP3… please wait", 12000);
+  const showSearchDrop = () => {
+    if (searchScrim) searchScrim.hidden = false;
+    if (searchDrop) searchDrop.hidden = false;
+    fitSearchDrop();
+  };
 
-      try {
-        const res = await fetch(dlUrl);
-        if (!res.ok) {
-          const errText = await res.text().catch(() => "Conversion failed");
-          throw new Error(errText);
-        }
-        const contentType = (res.headers.get("content-type") || "").toLowerCase();
-        if (!contentType.includes("audio") && !contentType.includes("octet-stream")) {
-          throw new Error("Invalid response format");
-        }
-        const blob = await res.blob();
-        if (blob.size < 1024) {
-          throw new Error("File too small");
-        }
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${cleanName}.mp3`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
-        showToast("✅ " + cleanName + ".mp3 downloaded!");
-      } catch (err) {
-        showToast("⚠ Opening backup MP3 downloader…", 4000);
-        window.open(`https://cobalt.tools/?u=${encodeURIComponent(ytUrl)}`, "_blank");
-      } finally {
-        btnDownload.classList.remove("is-busy");
+  /* Cap the panel height so it never slides under the player bar. */
+  const fitSearchDrop = () => {
+    if (!searchDrop || searchDrop.hidden || !ytSearchInput || !searchList) return;
+    const top = ytSearchInput.getBoundingClientRect().bottom + 8;
+    const room = window.innerHeight - top - 96;
+    const cap = Math.min(Math.max(140, room), 420);
+    if (searchList.style.maxHeight !== `${cap}px`) searchList.style.maxHeight = `${cap}px`;
+  };
+
+  const setSearchEmpty = (msg) => {
+    if (!searchEmpty) return;
+    if (msg) {
+      searchEmpty.textContent = msg;
+      searchEmpty.hidden = false;
+    } else {
+      searchEmpty.hidden = true;
+    }
+  };
+
+  const searchTrack = (it) => {
+    const title = cleanTitle(it.title);
+    const artist = deriveArtist(title, it.channel) || it.channel || "YouTube";
+    return { title, artist, dur: it.duration || 0, vid: it.id };
+  };
+
+  const playSearchResult = (item) => {
+    const tr = searchTrack(item);
+    savePasted([tr, ...loadPasted().filter((p) => p && p.vid !== tr.vid)]);
+    tracks = [tr, ...tracks.filter((x) => x.vid !== tr.vid)];
+    renderPlaylist();
+    startTrack(0);
+    updateActive();
+    hideSearchDrop();
+  };
+
+  const renderSearchResults = (items) => {
+    if (!searchList || !searchEmpty) return;
+    searchList.innerHTML = "";
+    setSearchEmpty(items.length
+      ? ""
+      : `No song found for "${(ytSearchInput.value || "").trim()}". Try a different song, artist or movie name.`);
+    const frag = document.createDocumentFragment();
+    items.forEach((it, i) => {
+      const dur = it.duration > 0 ? ` · ${fmtDur(it.duration)}` : "";
+      const sub = (it.channel || "YouTube") + dur;
+      const li = document.createElement("li");
+      li.className = "srch";
+      li.setAttribute("role", "button");
+      li.tabIndex = 0;
+      li.style.setProperty("--i", i);
+      li.innerHTML = `
+        <img class="srch__thumb" src="${it.thumb}" alt="" loading="lazy"/>
+        <span class="srch__meta">
+          <span class="srch__name" title="${escapeHtml(it.title)}">${escapeHtml(it.title)}</span>
+          <span class="srch__sub">${escapeHtml(sub)}</span>
+        </span>
+        <span class="srch__actions">
+          <button class="srch__btn srch__btn--play">Play</button>
+          <button class="srch__btn srch__btn--dl">MP3</button>
+        </span>`;
+      li.querySelector(".srch__btn--play").addEventListener("click", (e) => {
+        e.stopPropagation();
+        playSearchResult(it);
+      });
+      li.querySelector(".srch__btn--dl").addEventListener("click", (e) => {
+        e.stopPropagation();
+        downloadTrack(searchTrack(it), e.currentTarget);
+      });
+      li.addEventListener("click", () => playSearchResult(it));
+      li.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); playSearchResult(it); }
+      });
+      frag.appendChild(li);
+    });
+    searchList.appendChild(frag);
+    showSearchDrop();
+    fitSearchDrop();
+  };
+
+  const runSearch = async (q, attempt = 0) => {
+    const term = q.trim();
+    if (!term) { hideSearchDrop(); return; }
+    const seq = ++searchSeq;
+    showSearchDrop();
+    if (searchList) searchList.innerHTML = "";
+    setSearchEmpty("Searching YouTube…");
+    setSearchBusy(true);
+    try {
+      const res = await fetch(searchEndpoint(term));
+      let data = null;
+      try { data = await res.json(); } catch (_) {}
+      if (!res.ok || !data || !Array.isArray(data.results)) {
+        throw new Error(data && data.error ? data.error : `Search failed (HTTP ${res.status})`);
+      }
+      if (seq !== searchSeq) return; // stale response
+      const items = data.results.filter((it) => !it.duration || it.duration <= MAX_SONG_SEC);
+      renderSearchResults(items);
+    } catch (err) {
+      if (seq !== searchSeq) return;
+      // Transient failure (YouTube rate-limit, flaky network, waking server):
+      // retry once before showing an error so a hiccup never looks like "no results".
+      if (attempt < 1) {
+        setTimeout(() => { if (seq === searchSeq) runSearch(term, attempt + 1); }, 900);
+        return;
+      }
+      if (searchList) searchList.innerHTML = "";
+      const detail = err && err.message && err.message.includes("HTTP")
+        ? "The search server is not responding. Try again in a moment."
+        : "Something went wrong. Check your connection and try again.";
+      setSearchEmpty(detail);
+    } finally {
+      if (seq === searchSeq) setSearchBusy(false);
+    }
+  };
+
+  if (ytSearchInput) {
+    ytSearchInput.addEventListener("input", () => {
+      clearTimeout(searchDeb);
+      const v = ytSearchInput.value;
+      if (!v.trim()) { hideSearchDrop(); return; }
+      searchDeb = setTimeout(() => runSearch(v), 450);
+    });
+    ytSearchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        clearTimeout(searchDeb);
+        runSearch(ytSearchInput.value);
       }
     });
   }
+  if (searchBtn) {
+    searchBtn.addEventListener("click", () => runSearch(ytSearchInput ? ytSearchInput.value : ""));
+  }
+
+  document.addEventListener("click", (e) => {
+    if (!searchDrop || searchDrop.hidden) return;
+    if (searchDrop.contains(e.target) || (ytSearchInput && e.target === ytSearchInput)) return;
+    hideSearchDrop();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideSearchDrop(); });
+  window.addEventListener("resize", () => { if (searchDrop && !searchDrop.hidden) fitSearchDrop(); });
   ytLinkInput.addEventListener("keydown", (e) => { if (e.key === "Enter") handlePastedLink(); });
   btnFetchLink.addEventListener("click", handlePastedLink);
   searchInput.addEventListener("input", () => {

@@ -1,1 +1,4 @@
 tools/bin/
+server/node_modules/
+*.log
+.DS_Store

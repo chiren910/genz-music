@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="style.css?v=34"/>
+  <link rel="stylesheet" href="style.css?v=40"/>
 </head>
 <body>
   <div class="bg" aria-hidden="true">
@@ -114,6 +114,22 @@
       <p class="brand__tag">No signup. No apps. Just press play.</p>
     </div>
 
+    <div class="search">
+      <div class="search__box">
+        <svg class="search__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+        <input class="search__input" id="ytSearch" type="text" placeholder="Search any song on YouTube&hellip;" autocomplete="off" spellcheck="false" aria-label="Search songs on YouTube"/>
+        <button class="search__btn" id="btnSearch" title="Search YouTube">Search</button>
+      </div>
+      <div class="search__drop" id="searchDrop" hidden>
+        <ul class="search__list" id="searchList" aria-label="YouTube search results"></ul>
+        <div class="srch__empty" id="searchEmpty" hidden>&nbsp;</div>
+        <div class="search__foot">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ff0033" d="M23.5 6.2A3 3 0 0 0 21.4 4c-1.9-.5-9.4-.5-9.4-.5s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8z"/><path fill="#fff" d="M9.5 15.6 15.8 12 9.5 8.4z"/></svg>
+          Results from YouTube
+        </div>
+      </div>
+    </div>
+
     <div class="marquee" aria-hidden="true">
       <div class="marquee__track" id="marqueeTrack">
         <span class="marquee__text" id="marqueeText">Loading playlist&hellip;</span>
@@ -136,6 +152,8 @@
     </div>
 
   </main>
+
+  <div class="search-scrim" id="searchScrim" hidden></div>
 
   <div class="playlist-scrim" id="playlistScrim" hidden></div>
 
@@ -223,6 +241,6 @@
     <div id="ytPlayer"></div>
   </div>
 
-  <script src="main.js?v=34"></script>
+  <script src="main.js?v=40"></script>
 </body>
 </html>
