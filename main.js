@@ -832,11 +832,17 @@
     return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   };
 
-  const RENDER_BACKEND = "https://genz-music-backend.onrender.com";
-  const isStaticHost = () =>
-    window.location.hostname.includes("vercel.app") ||
-    window.location.hostname.includes("github.io") ||
-    window.location.protocol === "file:";
+  const RENDER_BACKEND =
+    (typeof window !== "undefined" && window.__GENZ_BACKEND_URL__) ||
+    (typeof localStorage !== "undefined" && localStorage.getItem("GENZ_BACKEND_URL")) ||
+    "https://genz-music-backend.onrender.com";
+
+  const isStaticHost = () => {
+    const host = window.location.hostname;
+    // Local Apache/XAMPP environment serves PHP directly
+    const isLocalApache = (host === "localhost" || host === "127.0.0.1") && (window.location.port === "" || window.location.port === "80");
+    return !isLocalApache;
+  };
 
   const searchEndpoint = (q) => {
     const params = new URLSearchParams({ q, count: "10" });

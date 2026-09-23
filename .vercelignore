@@ -1,0 +1,11 @@
+# Backend server files (hosted on Render Docker)
+api/
+server/
+tools/
+Dockerfile
+render.yaml
+
+# Local development / git files
+.git
+.github
+*.log
