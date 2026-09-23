@@ -26,9 +26,11 @@ A sleek, high-performance web music player and 320kbps YouTube-to-MP3 converter 
 
 ## 🚀 Live Deployment
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/chiren910/genz-music)
+
 Follow the complete, step-by-step instructions in our [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) to launch GENZ MUSIC live for free:
 
-1. **Deploy Backend**: Render Web Service (Docker runtime from `Dockerfile`).
+1. **Deploy Backend**: Click the button above or use [render.com/deploy](https://render.com/deploy?repo=https://github.com/chiren910/genz-music) to auto-deploy the Docker backend from `render.yaml`.
 2. **Deploy Frontend**: Vercel (`vercel.json` and `.vercelignore` pre-configured).
 3. **Prevent Cold Starts**: Free keep-alive ping via UptimeRobot.
 
