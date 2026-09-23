@@ -9,7 +9,7 @@ A sleek, high-performance web music player and 320kbps YouTube-to-MP3 converter 
 - **Instant Streaming**: Embedded YouTube nocookie audio streaming with responsive visualizer and live listener counter.
 - **Sub-3s Fast Search**: Parallelized Innertube API queries with multi-pass `yt-dlp` fallback and smart title relevance ranking.
 - **Studio-Quality MP3 Downloads**: Converts YouTube audio to true **320kbps MP3** on the fly using `ffmpeg` and `yt-dlp`, complete with sanitized metadata and mobile-compatible download headers.
-- **Fail-Safe Fallback**: Automatic redirection to Cobalt Tools downloader if YouTube stream restriction triggers.
+- **Fail-Safe Fallback**: Automatic clipboard copy and redirection to high-speed MP3 converter if YouTube restricts datacenter stream conversion.
 - **Curated Playlists**: Built-in support for CSV-based playlists (English Top Hits, Bollywood 250+).
 - **Responsive Cyberpunk / Retro Dark UI**: Glassmorphic styling, neon glows, mobile bottom-sheet playlist, and touch-optimized playbar.
 

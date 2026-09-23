@@ -164,7 +164,7 @@ Once both services are deployed, test your live site with these steps:
 3. **Song Download**: Click the download icon (⬇) on any search result or the main playbar.
    - You should see toast: `⬇ Converting to 320kbps MP3… please wait`.
    - Your browser should download `<SongName>.mp3` with clean ID3 tags.
-4. **Fallback Test**: In the rare event YouTube restricts a stream, verify that the toast automatically opens Cobalt Tools (`https://cobalt.tools`) as a safety backup.
+4. **Fallback Test**: If YouTube restricts datacenter stream conversion, verify that the toast automatically copies the song URL to the clipboard and opens `https://tomp3.cc/` where the user can paste and download immediately.
 
 ---
 
@@ -172,7 +172,7 @@ Once both services are deployed, test your live site with these steps:
 
 | Issue | Cause | Solution |
 | :--- | :--- | :--- |
+| **"Sign in to confirm you're not a bot"** | YouTube flags cloud datacenter IPs | 1) Export your YouTube cookies using the free Chrome extension "Get cookies.txt LOCALLY".<br>2) Go to Render Dashboard &rarr; `genz-music-backend` &rarr; **Environment** &rarr; Add `YOUTUBE_COOKIES` and paste the cookie content.<br>3) Or use the automatic fallback downloader `tomp3.cc`. |
 | **Search fails with 502** | Render backend container is still spinning up | Wait 30 seconds for container to wake up, or set up UptimeRobot keep-alive. |
 | **CORS error in browser console** | Backend didn't allow origin | Express backend has `cors({ origin: '*' })` enabled by default. Check if backend URL is HTTPS. |
-| **Download shows "Converted MP3 not found"** | yt-dlp temporary stream issue | Check Render logs tab under dashboard to see yt-dlp output. |
 | **Memory exceeded on Render** | Free tier 512MB RAM cap reached during multiple simultaneous conversions | Restart service in Render dashboard or consider Railway ($5/mo) if usage scales. |

@@ -65,7 +65,6 @@ const handleDownload = (req, res) => {
     '-x',
     '--audio-format', 'mp3',
     '--audio-quality', '320K',
-    '-N', '8',
     '--no-part',
     '--no-playlist',
     '--no-warnings',
@@ -76,9 +75,20 @@ const handleDownload = (req, res) => {
     '-o', outTemplate,
     '--no-simulate',
     '--print', 'after_move:%(filepath)s',
-    '--print', 'after_move:%(title)s',
-    watchUrl
+    '--print', 'after_move:%(title)s'
   ];
+
+  const cookieFile = path.join(TMP_DIR, 'cookies.txt');
+  if (process.env.YOUTUBE_COOKIES && process.env.YOUTUBE_COOKIES.trim()) {
+    try {
+      fs.writeFileSync(cookieFile, process.env.YOUTUBE_COOKIES.trim());
+      args.push('--cookies', cookieFile);
+    } catch (_) {}
+  } else if (fs.existsSync(path.join(__dirname, 'cookies.txt'))) {
+    args.push('--cookies', path.join(__dirname, 'cookies.txt'));
+  }
+
+  args.push(watchUrl);
 
   const proc = spawn('yt-dlp', args);
   let stdout = '';

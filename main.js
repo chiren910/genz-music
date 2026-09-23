@@ -891,8 +891,13 @@
       showToast("✅ " + cleanName + ".mp3 downloaded!");
       return true;
     } catch (err) {
-      showToast("⚠ Opening backup MP3 downloader…", 4000);
-      window.open(`https://cobalt.tools/?u=${encodeURIComponent(ytUrl)}`, "_blank");
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(ytUrl).catch(() => {});
+        }
+      } catch (_) {}
+      showToast("📋 Song link copied! Opening MP3 Downloader…", 5000);
+      window.open("https://tomp3.cc/", "_blank");
       return false;
     } finally {
       if (btnEl) btnEl.classList.remove("is-busy");
