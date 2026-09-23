@@ -1,4 +1,5 @@
 tools/bin/
 server/node_modules/
 *.log
+*cookies*
 .DS_Store

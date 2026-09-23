@@ -81,7 +81,24 @@ const handleDownload = (req, res) => {
   const cookieFile = path.join(TMP_DIR, 'cookies.txt');
   if (process.env.YOUTUBE_COOKIES && process.env.YOUTUBE_COOKIES.trim()) {
     try {
-      fs.writeFileSync(cookieFile, process.env.YOUTUBE_COOKIES.trim());
+      const rawLines = process.env.YOUTUBE_COOKIES.trim().split(/\r?\n/);
+      const cleanRows = ['# Netscape HTTP Cookie File'];
+      for (const line of rawLines) {
+        if (!line.trim() || line.startsWith('#')) continue;
+        if (line.includes('\t') && line.split('\t').length >= 7) {
+          cleanRows.push(line);
+          continue;
+        }
+        const p = line.trim().split(/\s+/);
+        if (p.length >= 7) {
+          const row = [p[0], p[1], p[2], p[3], p[4], p[5], p.slice(6).join(' ')].join('\t');
+          cleanRows.push(row);
+          if (p[0].includes('google.com')) {
+            cleanRows.push([p[0].replace('google.com', 'youtube.com'), p[1], p[2], p[3], p[4], p[5], p.slice(6).join(' ')].join('\t'));
+          }
+        }
+      }
+      fs.writeFileSync(cookieFile, cleanRows.join('\n'));
       args.push('--cookies', cookieFile);
     } catch (_) {}
   } else if (fs.existsSync(path.join(__dirname, 'cookies.txt'))) {
