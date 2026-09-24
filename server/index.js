@@ -49,44 +49,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-const handleDownload = (req, res) => {
-  const vid = (req.query.v || '').toString().trim();
-  if (!/^[\w-]{11}$/.test(vid)) {
-    return res.status(400).send('Invalid video id');
-  }
-
-  const requestedName = (req.query.name || req.params.filename || '').toString().trim();
-  const watchUrl = `https://www.youtube.com/watch?v=${vid}`;
-  const outTemplate = path.join(TMP_DIR, `${vid}.%(ext)s`);
-
-  const args = [
-    '-f', 'bestaudio/best',
-    '-S', 'abr,asr',
-    '-x',
-    '--audio-format', 'mp3',
-    '--audio-quality', '320K',
-    '--no-part',
-    '--no-playlist',
-    '--no-warnings',
-    '--no-progress',
-    '--no-check-certificates',
-    '--no-cache-dir',
-    '--extractor-args', 'youtube:player_client=android,ios,mweb',
-    '--embed-metadata',
-    '-o', outTemplate,
-    '--no-simulate',
-    '--print', 'after_move:%(filepath)s',
-    '--print', 'after_move:%(title)s'
-  ];
-
+let cookiesPrepared = false;
+const prepareCookies = () => {
+  if (cookiesPrepared) return;
   const cookieFile = path.join(TMP_DIR, 'cookies.txt');
-  const secretCookiePath = '/etc/secrets/cookies.txt';
-  const localCookiePath = path.join(__dirname, 'cookies.txt');
-
-  if (fs.existsSync(secretCookiePath)) {
-    args.push('--cookies', secretCookiePath);
-    console.log('[cookies] Using Render secret file cookies:', secretCookiePath);
-  } else if (process.env.YOUTUBE_COOKIES && process.env.YOUTUBE_COOKIES.trim()) {
+  if (process.env.YOUTUBE_COOKIES && process.env.YOUTUBE_COOKIES.trim()) {
     try {
       let rawText = process.env.YOUTUBE_COOKIES.trim();
       if (!rawText.includes('\t') && !rawText.includes(' ') && rawText.length > 100) {
@@ -117,77 +84,137 @@ const handleDownload = (req, res) => {
       }
       if (cleanRows.length > 1) {
         fs.writeFileSync(cookieFile, cleanRows.join('\n'));
-        args.push('--cookies', cookieFile);
-        console.log(`[cookies] Attached ${cleanRows.length - 1} cookies from YOUTUBE_COOKIES`);
+        console.log(`[cookies] Prepared ${cleanRows.length - 1} cookies for fallback`);
       }
     } catch (e) {
       console.error('[cookies] Failed to parse cookies:', e.message);
     }
-  } else if (fs.existsSync(localCookiePath)) {
-    args.push('--cookies', localCookiePath);
-    console.log('[cookies] Using local file cookies:', localCookiePath);
   }
+  cookiesPrepared = true;
+};
 
-  args.push(watchUrl);
+const hasCookiesAvailable = () => {
+  return fs.existsSync('/etc/secrets/cookies.txt') ||
+         fs.existsSync(path.join(TMP_DIR, 'cookies.txt')) ||
+         fs.existsSync(path.join(__dirname, 'cookies.txt'));
+};
 
-  const proc = spawn('yt-dlp', args);
-  let stdout = '';
-  let stderr = '';
+const executeDownload = (watchUrl, outTemplate, useCookies = false) => {
+  return new Promise((resolve) => {
+    const args = [
+      '-f', 'bestaudio/best',
+      '-S', 'abr,asr',
+      '-x',
+      '--audio-format', 'mp3',
+      '--audio-quality', '320K',
+      '--no-part',
+      '--no-playlist',
+      '--no-warnings',
+      '--no-progress',
+      '--no-check-certificates',
+      '--no-cache-dir',
+      '--js-runtimes', 'node',
+      '--extractor-args', 'youtube:player_client=android',
+      '--embed-metadata',
+      '-o', outTemplate,
+      '--no-simulate',
+      '--print', 'after_move:%(filepath)s',
+      '--print', 'after_move:%(title)s'
+    ];
 
-  proc.stdout.on('data', (d) => { stdout += d.toString(); });
-  proc.stderr.on('data', (d) => { stderr += d.toString(); });
+    if (useCookies) {
+      const secretCookiePath = '/etc/secrets/cookies.txt';
+      const localCookiePath = path.join(__dirname, 'cookies.txt');
+      const cookieFile = path.join(TMP_DIR, 'cookies.txt');
 
-  proc.on('close', (code) => {
-    if (code !== 0) {
-      console.error('yt-dlp failed:', stderr);
-      return res.status(502).send('Could not convert this track.');
-    }
-
-    const lines = stdout.split('\n').map((l) => l.trim()).filter(Boolean);
-    let filePath = '';
-    let title = requestedName;
-
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].toLowerCase().endsWith('.mp3') && fs.existsSync(lines[i])) {
-        filePath = lines[i];
-        if (!title && lines[i + 1]) title = lines[i + 1];
-        break;
+      if (fs.existsSync(secretCookiePath)) {
+        args.push('--cookies', secretCookiePath);
+      } else if (fs.existsSync(cookieFile)) {
+        args.push('--cookies', cookieFile);
+      } else if (fs.existsSync(localCookiePath)) {
+        args.push('--cookies', localCookiePath);
       }
     }
 
-    if (!filePath || !fs.existsSync(filePath)) {
-      return res.status(500).send('Converted MP3 not found.');
+    args.push(watchUrl);
+
+    const proc = spawn('yt-dlp', args);
+    let stdout = '';
+    let stderr = '';
+
+    proc.stdout.on('data', (d) => { stdout += d.toString(); });
+    proc.stderr.on('data', (d) => { stderr += d.toString(); });
+
+    proc.on('close', (code) => {
+      resolve({ code, stdout, stderr });
+    });
+  });
+};
+
+const handleDownload = async (req, res) => {
+  const vid = (req.query.v || '').toString().trim();
+  if (!/^[\w-]{11}$/.test(vid)) {
+    return res.status(400).send('Invalid video id');
+  }
+
+  const requestedName = (req.query.name || req.params.filename || '').toString().trim();
+  const watchUrl = `https://www.youtube.com/watch?v=${vid}`;
+  const outTemplate = path.join(TMP_DIR, `${vid}.%(ext)s`);
+
+  prepareCookies();
+
+  let result = await executeDownload(watchUrl, outTemplate, false);
+
+  if (result.code !== 0 && hasCookiesAvailable()) {
+    console.warn('[yt-dlp] Anonymous android download failed, retrying with cookies...');
+    result = await executeDownload(watchUrl, outTemplate, true);
+  }
+
+  if (result.code !== 0) {
+    console.error('yt-dlp failed:', result.stderr);
+    return res.status(502).send('Could not convert this track.');
+  }
+
+  const lines = result.stdout.split('\n').map((l) => l.trim()).filter(Boolean);
+  let filePath = '';
+  let title = requestedName;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].toLowerCase().endsWith('.mp3') && fs.existsSync(lines[i])) {
+      filePath = lines[i];
+      if (!title && lines[i + 1]) title = lines[i + 1];
+      break;
     }
+  }
 
-    const safeTitle = (title || 'song').replace(/[\\/:*?"<>|\x00-\x1F]/g, '').trim() || 'song';
-    const asciiSafe = safeTitle.replace(/[^a-zA-Z0-9_\-\. ]/g, '').trim() || 'song';
-    const encoded = encodeURIComponent(`${safeTitle}.mp3`);
-    const stat = fs.statSync(filePath);
+  if (!filePath || !fs.existsSync(filePath)) {
+    return res.status(500).send('Converted MP3 not found.');
+  }
 
-    res.setHeader('Content-Description', 'File Transfer');
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Disposition', `attachment; filename="${asciiSafe}.mp3"; filename*=UTF-8''${encoded}`);
-    res.setHeader('Content-Transfer-Encoding', 'binary');
-    res.setHeader('Content-Length', stat.size);
-    res.setHeader('Cache-Control', 'must-revalidate, post-check=0, pre-check=0');
-    res.setHeader('Pragma', 'public');
+  const safeTitle = (title || 'song').replace(/[\\/:*?"<>|\x00-\x1F]/g, '').trim() || 'song';
+  const asciiSafe = safeTitle.replace(/[^a-zA-Z0-9_\-\. ]/g, '').trim() || 'song';
+  const encoded = encodeURIComponent(`${safeTitle}.mp3`);
+  const stat = fs.statSync(filePath);
 
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
+  res.setHeader('Content-Description', 'File Transfer');
+  res.setHeader('Content-Type', 'audio/mpeg');
+  res.setHeader('Content-Disposition', `attachment; filename="${asciiSafe}.mp3"; filename*=UTF-8''${encoded}`);
+  res.setHeader('Content-Transfer-Encoding', 'binary');
+  res.setHeader('Content-Length', stat.size);
+  res.setHeader('Cache-Control', 'must-revalidate, post-check=0, pre-check=0');
+  res.setHeader('Pragma', 'public');
 
-    const cleanup = () => {
-      try {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      } catch (_) {}
-    };
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
 
-    res.on('finish', cleanup);
-    res.on('close', cleanup);
-  });
+  const cleanup = () => {
+    try {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    } catch (_) {}
+  };
 
-  req.on('close', () => {
-    try { proc.kill(); } catch (_) {}
-  });
+  res.on('finish', cleanup);
+  res.on('close', cleanup);
 };
 
 const scoreTitle = (title, tokens, plainLower) => {
@@ -215,7 +242,8 @@ const runSearch = (searchArg) =>
       '--no-progress',
       '--no-check-certificates',
       '--no-cache-dir',
-      '--extractor-args', 'youtube:player_client=android,ios,mweb',
+      '--js-runtimes', 'node',
+      '--extractor-args', 'youtube:player_client=android',
       '--dump-single-json',
       searchArg
     ];
