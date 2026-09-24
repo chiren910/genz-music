@@ -15,6 +15,8 @@ declare(strict_types=1);
 set_time_limit(0);
 ignore_user_abort(false);
 
+header('Access-Control-Allow-Origin: *');
+
 $vid = isset($_GET['v']) ? trim((string)$_GET['v']) : '';
 if (!preg_match('/^[\w-]{11}$/', $vid)) {
     http_response_code(400);

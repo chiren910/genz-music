@@ -815,12 +815,14 @@
   /* ---------- Playbar: download the current song as MP3 ---------- */
   const toastEl = document.getElementById("toast");
   let toastTimer = null;
-  const showToast = (msg, dur = 3500) => {
+  const showToast = (msg, dur = 3500, onClick = null) => {
     if (!toastEl) return;
     clearTimeout(toastTimer);
-    toastEl.textContent = msg;
+    toastEl.innerHTML = msg;
     toastEl.hidden = false;
     toastEl.classList.add("is-visible");
+    toastEl.onclick = onClick || null;
+    toastEl.style.cursor = onClick ? "pointer" : "default";
     toastTimer = setTimeout(() => {
       toastEl.classList.remove("is-visible");
       setTimeout(() => { toastEl.hidden = true; }, 300);
@@ -840,7 +842,14 @@
   const isStaticHost = () => {
     const host = window.location.hostname;
     // Local Apache/XAMPP environment serves PHP directly
-    const isLocalApache = (host === "localhost" || host === "127.0.0.1") && (window.location.port === "" || window.location.port === "80");
+    const isLocal =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host.startsWith("192.168.") ||
+      host.startsWith("10.") ||
+      host.startsWith("172.") ||
+      host.endsWith(".local");
+    const isLocalApache = isLocal && (window.location.port === "" || window.location.port === "80");
     return !isLocalApache;
   };
 
@@ -865,55 +874,66 @@
 
     if (btnEl) btnEl.classList.add("is-busy");
 
-    if (isMobile()) {
-      showToast("⬇ Converting 320kbps MP3… download will start shortly", 15000);
-      const a = document.createElement("a");
-      a.href = dlUrl;
-      a.download = fileName;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        a.remove();
-        if (btnEl) btnEl.classList.remove("is-busy");
-      }, 8000);
-      return true;
-    }
+    showToast("⬇ Converting 320kbps MP3… please wait", 35000);
 
-    showToast("⬇ Converting to 320kbps MP3… please wait", 12000);
-
-    try {
-      const res = await fetch(dlUrl);
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "Conversion failed");
-        throw new Error(errText);
-      }
-      const contentType = (res.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.includes("audio") && !contentType.includes("octet-stream")) {
-        throw new Error("Invalid response format");
-      }
-      const blob = await res.blob();
-      if (blob.size < 1024) {
-        throw new Error("File too small");
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${cleanName}.mp3`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-      showToast("✅ " + cleanName + ".mp3 downloaded!");
-      return true;
-    } catch (err) {
+    const copySongLink = () => {
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(ytUrl).catch(() => {});
         }
       } catch (_) {}
-      showToast("📋 Song link copied! Opening MP3 Downloader…", 5000);
-      window.open("https://tomp3.cc/", "_blank");
+    };
+
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 65000);
+
+      const res = await fetch(dlUrl, { signal: ctrl.signal }).catch((err) => {
+        throw new Error(err.name === "AbortError" ? "Conversion timed out" : "Server could not be reached");
+      });
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "Conversion failed");
+        throw new Error(errText || "Conversion failed");
+      }
+
+      const contentType = (res.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.includes("audio") && !contentType.includes("octet-stream")) {
+        throw new Error("Invalid response format");
+      }
+
+      const blob = await res.blob();
+      if (blob.size < 1024) {
+        throw new Error("File too small");
+      }
+
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `${cleanName}.mp3`;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+
+      setTimeout(() => {
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+      }, 30000);
+
+      showToast("✅ " + cleanName + ".mp3 downloaded!", 5000);
+      return true;
+    } catch (err) {
+      console.warn("Download failed:", err);
+      copySongLink();
+      showToast(
+        '📋 Song link copied! <span style="text-decoration:underline;color:#00ffff;font-weight:700;margin-left:6px;">Tap to download ↗</span>',
+        14000,
+        () => window.open("https://tomp3.cc/", "_blank")
+      );
+      try {
+        window.open("https://tomp3.cc/", "_blank");
+      } catch (_) {}
       return false;
     } finally {
       if (btnEl) btnEl.classList.remove("is-busy");
