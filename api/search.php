@@ -158,6 +158,7 @@ $ytdlpSearch = static function (string $searchArg) use ($ytDlp): array {
     $cmd = '"' . $ytDlp . '"'
         . ' --flat-playlist'
         . ' --no-warnings --no-progress --no-check-certificates --no-cache-dir'
+        . ' --extractor-args "youtube:player_client=android,ios,mweb"'
         . ' --dump-single-json'
         . ' "ytsearch' . $searchArg . '"';
 

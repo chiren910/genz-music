@@ -71,6 +71,7 @@ const handleDownload = (req, res) => {
     '--no-progress',
     '--no-check-certificates',
     '--no-cache-dir',
+    '--extractor-args', 'youtube:player_client=android,ios,mweb',
     '--embed-metadata',
     '-o', outTemplate,
     '--no-simulate',
@@ -79,9 +80,25 @@ const handleDownload = (req, res) => {
   ];
 
   const cookieFile = path.join(TMP_DIR, 'cookies.txt');
-  if (process.env.YOUTUBE_COOKIES && process.env.YOUTUBE_COOKIES.trim()) {
+  const secretCookiePath = '/etc/secrets/cookies.txt';
+  const localCookiePath = path.join(__dirname, 'cookies.txt');
+
+  if (fs.existsSync(secretCookiePath)) {
+    args.push('--cookies', secretCookiePath);
+    console.log('[cookies] Using Render secret file cookies:', secretCookiePath);
+  } else if (process.env.YOUTUBE_COOKIES && process.env.YOUTUBE_COOKIES.trim()) {
     try {
-      const rawLines = process.env.YOUTUBE_COOKIES.trim().split(/\r?\n/);
+      let rawText = process.env.YOUTUBE_COOKIES.trim();
+      if (!rawText.includes('\t') && !rawText.includes(' ') && rawText.length > 100) {
+        try {
+          const decoded = Buffer.from(rawText, 'base64').toString('utf-8');
+          if (decoded.includes('.google.com') || decoded.includes('.youtube.com') || decoded.includes('Netscape')) {
+            rawText = decoded;
+          }
+        } catch (_) {}
+      }
+      rawText = rawText.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+      const rawLines = rawText.split(/\r?\n/);
       const cleanRows = ['# Netscape HTTP Cookie File'];
       for (const line of rawLines) {
         if (!line.trim() || line.startsWith('#')) continue;
@@ -98,11 +115,17 @@ const handleDownload = (req, res) => {
           }
         }
       }
-      fs.writeFileSync(cookieFile, cleanRows.join('\n'));
-      args.push('--cookies', cookieFile);
-    } catch (_) {}
-  } else if (fs.existsSync(path.join(__dirname, 'cookies.txt'))) {
-    args.push('--cookies', path.join(__dirname, 'cookies.txt'));
+      if (cleanRows.length > 1) {
+        fs.writeFileSync(cookieFile, cleanRows.join('\n'));
+        args.push('--cookies', cookieFile);
+        console.log(`[cookies] Attached ${cleanRows.length - 1} cookies from YOUTUBE_COOKIES`);
+      }
+    } catch (e) {
+      console.error('[cookies] Failed to parse cookies:', e.message);
+    }
+  } else if (fs.existsSync(localCookiePath)) {
+    args.push('--cookies', localCookiePath);
+    console.log('[cookies] Using local file cookies:', localCookiePath);
   }
 
   args.push(watchUrl);
@@ -192,6 +215,7 @@ const runSearch = (searchArg) =>
       '--no-progress',
       '--no-check-certificates',
       '--no-cache-dir',
+      '--extractor-args', 'youtube:player_client=android,ios,mweb',
       '--dump-single-json',
       searchArg
     ];

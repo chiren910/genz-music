@@ -58,12 +58,17 @@ $watchUrl = 'https://www.youtube.com/watch?v=' . $vid;
  *   --audio-quality 320K   constant 320 kbps stereo — maximum MP3 fidelity
  *   --embed-metadata       ID3 tags (title/artist/uploader) for free
  */
+$cookieFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'server' . DIRECTORY_SEPARATOR . 'cookies.txt';
+$cookieArg = is_file($cookieFile) ? ' --cookies ' . escapeshellarg($cookieFile) : '';
+
 $cmd = '"' . $ytDlp . '"'
      . ' -f bestaudio/best -S abr,asr'
      . ' -x --audio-format mp3 --audio-quality 320K'
      . ' -N 8 --no-part'
      . ' --no-playlist --no-warnings --no-progress --no-check-certificates'
      . ' --no-cache-dir'
+     . ' --extractor-args "youtube:player_client=android,ios,mweb"'
+     . $cookieArg
      . ' --windows-filenames --trim-filenames 120'
      . ' --embed-metadata'
      . ' --ffmpeg-location "' . $ffmpeg . '"'
