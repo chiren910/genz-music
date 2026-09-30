@@ -18,22 +18,6 @@
   tick();
   setInterval(tick, 1000);
 
-  /* ---------- Listeners count (mock) ---------- */
-  const countEl = document.querySelector(".listeners__count");
-  const statListenersEl = document.getElementById("statListeners");
-  let listeners = 1248;
-  const renderListeners = () => {
-    const s = listeners.toLocaleString("en-IN");
-    countEl.textContent = s;
-    if (statListenersEl) statListenersEl.textContent = s;
-  };
-  renderListeners();
-  setInterval(() => {
-    const delta = Math.round(Math.random() * 14 - 7);
-    listeners = Math.max(900, listeners + delta);
-    renderListeners();
-  }, 3500);
-
   /* ---------- Mock player (playlist loaded from CSV) ---------- */
   const fallbackTracks = [
     { title: "Highway Diaries", artist: "GenZ Saloon Band", dur: 214 },
@@ -45,6 +29,13 @@
   ];
 
   let tracks = fallbackTracks.slice();
+
+  /* ---------- Track count stat ---------- */
+  const statTracksEl = document.getElementById("statTracks");
+  const updateTracksStat = () => {
+    if (statTracksEl) statTracksEl.textContent = `${tracks && tracks.length ? tracks.length : 250}+`;
+  };
+  updateTracksStat();
 
   const toSeconds = (ms) => {
     const p = String(ms).split(":").map(Number);
@@ -183,6 +174,7 @@
     });
     const sg = document.getElementById("statGenre");
     if (sg) sg.textContent = genreLabel(genre);
+    updateTracksStat();
   };
 
   const useGenre = (key, autoplay) => {
@@ -858,6 +850,42 @@
     return `${isStaticHost() ? `${RENDER_BACKEND}/search?` : "api/search.php?"}${params.toString()}`;
   };
 
+  /* ---------- download helpers ---------- */
+
+  /* Windows silently drops trailing dots/spaces, which would eat the ".mp3"
+     extension and leave the file unopenable. */
+  const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i;
+
+  const windowsSafeFileName = (name) => {
+    let n = String(name || "")
+      .replace(/[\\/:*?"<>|\x00-\x1F]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/[. ]+$/g, "")
+      .trim();
+    if (n.length > 100) n = n.slice(0, 100).trim().replace(/[. ]+$/g, "");
+    if (!n || WINDOWS_RESERVED.test(n)) n = "song";
+    return n;
+  };
+
+  /* An MPEG audio frame sync: 11 set bits => 0xFF 0xE0-mask. ID3 = "ID3". */
+  const looksLikeMp3 = (bytes) => {
+    if (bytes.length < 2) return false;
+    if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return true;
+    return bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0;
+  };
+
+  /* Blob URLs must outlive the download. Revoking one while Chrome's download
+     manager is still streaming from it aborts the transfer and strands a
+     "<name>.mp3.crdownload" file that never completes and never opens. */
+  const liveBlobUrls = new Set();
+  const releaseBlobUrls = () => {
+    liveBlobUrls.forEach((u) => URL.revokeObjectURL(u));
+    liveBlobUrls.clear();
+  };
+  window.addEventListener("pagehide", releaseBlobUrls);
+  window.addEventListener("beforeunload", releaseBlobUrls);
+
   const downloadTrack = async (tr, btnEl = null) => {
     if (!tr || !tr.vid) return false;
     if (btnEl && btnEl.classList.contains("is-busy")) return false;
@@ -886,7 +914,9 @@
 
     try {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 65000);
+      /* Generous: a 6-minute track needs a full download + transcode, and a
+         premature abort here would dump the user on the non-MP3 fallback. */
+      const timer = setTimeout(() => ctrl.abort(), 240000);
 
       const res = await fetch(dlUrl, { signal: ctrl.signal }).catch((err) => {
         throw new Error(err.name === "AbortError" ? "Conversion timed out" : "Server could not be reached");
@@ -908,20 +938,29 @@
         throw new Error("File too small");
       }
 
+      /* Never hand the user a mislabelled file: confirm it really is MPEG
+         audio before it is saved as ".mp3". */
+      const head = new Uint8Array(await blob.slice(0, 3).arrayBuffer());
+      if (!looksLikeMp3(head)) {
+        throw new Error("Server returned a non-MP3 file");
+      }
+
+      const saveName = `${windowsSafeFileName(cleanName)}.mp3`;
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = `${cleanName}.mp3`;
+      a.download = saveName;
       a.style.display = "none";
       document.body.appendChild(a);
       a.click();
 
-      setTimeout(() => {
-        a.remove();
-        URL.revokeObjectURL(blobUrl);
-      }, 30000);
+      /* Do NOT revoke on a short timer - Chrome reads the blob lazily while it
+         writes the file, and revoking mid-write leaves a stuck .crdownload.
+         Hold it until the tab unloads. */
+      liveBlobUrls.add(blobUrl);
+      setTimeout(() => { a.remove(); }, 60000);
 
-      showToast("✅ " + cleanName + ".mp3 downloaded!", 5000);
+      showToast("✅ " + saveName + " downloaded!", 5000);
       return true;
     } catch (err) {
       console.warn("Download failed:", err);
@@ -979,8 +1018,10 @@
   const fitSearchDrop = () => {
     if (!searchDrop || searchDrop.hidden || !ytSearchInput || !searchList) return;
     const top = ytSearchInput.getBoundingClientRect().bottom + 8;
-    const room = window.innerHeight - top - 96;
-    const cap = Math.min(Math.max(140, room), 420);
+    const pBar = document.getElementById("playerBar");
+    const reserve = pBar ? (pBar.offsetHeight + 16) : 96;
+    const room = window.innerHeight - top - reserve;
+    const cap = Math.min(Math.max(140, room), 460);
     if (searchList.style.maxHeight !== `${cap}px`) searchList.style.maxHeight = `${cap}px`;
   };
 
@@ -1175,6 +1216,8 @@
 
   listBtn.addEventListener("click", () => setList(playlistPanel.hidden));
   playlistScrim.addEventListener("click", () => setList(false));
+  const btnCloseList = document.getElementById("btnCloseList");
+  if (btnCloseList) btnCloseList.addEventListener("click", () => setList(false));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") setList(false); });
 
   document.addEventListener("keydown", (e) => {
